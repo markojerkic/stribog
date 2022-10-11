@@ -1,27 +1,52 @@
-use std::{env, fs};
+use error_chain::error_chain;
 
-fn main() {
-    let current_dir = env::current_dir().unwrap();
-    println!(
-        "Entries modified in the last 24 hours in {:?}:",
-        current_dir
-    );
+use walkdir::WalkDir;
 
-    for entry_res in fs::read_dir(current_dir).unwrap() {
-        let entry = entry_res.unwrap();
-        let path = entry.path();
+error_chain! {
+    foreign_links {
+        WalkDir(walkdir::Error);
+        Io(std::io::Error);
+        SystemTime(std::time::SystemTimeError);
+    }
+}
 
-        let metadata = fs::metadata(&path).unwrap();
-        let last_modified = metadata.modified().unwrap().elapsed().unwrap().as_secs();
+use walkdir::DirEntry;
 
-        if last_modified < 5 * 24 * 3600 && metadata.is_file() {
-            println!(
-                "Last modified: {:?} seconds, is read only: {:?}, size: {:?} bytes, filename: {:?}",
-                last_modified,
-                metadata.permissions().readonly(),
-                metadata.len(),
-                path.file_name().ok_or("No filename")
-            );
+fn is_hidden(entry: &DirEntry) -> bool {
+    entry
+        .file_name()
+        .to_str()
+        .map(|s| s.starts_with("."))
+        .unwrap_or(false)
+}
+
+fn list_dir(dir: &str, mut dir_vec: Vec<String>) -> Result<()> {
+    let walker = WalkDir::new(dir);
+
+    for entry in walker
+        .into_iter()
+        .filter(|entry| entry.is_ok())
+        .map(|entry| entry.unwrap())
+        .filter(|entry| is_hidden(entry))
+    {
+        let pntr = entry.path().display().to_string();
+        dir_vec.push(pntr);
+    }
+
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let home_walker = WalkDir::new("/")
+        .follow_links(true)
+        .max_depth(3)
+        .follow_links(true);
+
+    for entry in home_walker.into_iter() {
+        if entry.is_ok() {
+            println!("{}", entry?.path().display());
         }
     }
+
+    Ok(())
 }
