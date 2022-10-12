@@ -22,7 +22,8 @@ fn is_whitelisted(file_name: &str, forbidden: &Vec<String>) -> bool {
     true
 }
 
-fn walk_dir(dir: String, forbidden: Vec<String>) -> Result<()> {
+fn walk_dir(dir: &str, forbidden: &Vec<String>) -> Result<()> {
+    println!("{}", dir);
     let walker = WalkDir::new(dir);
 
     let dirs = walker
@@ -34,22 +35,29 @@ fn walk_dir(dir: String, forbidden: Vec<String>) -> Result<()> {
         .filter(|entry| {
             is_whitelisted(
                 entry.file_name().to_string_lossy().to_string().as_str(),
-                &forbidden,
+                forbidden,
             )
         })
-        .map(|entry| entry.path().display().to_string());
-
+        .map(|entry| entry.path().display().to_string())
+        .filter(|entry| !entry.eq(dir));
+    let mut res = Ok(());
+    if dir.len() == 0 {
+        return Ok(());
+    }
     for dir in dirs {
-        println!("{}", dir);
+        res = walk_dir(&dir, &forbidden);
     }
 
-    Ok(())
+    res
 }
 
 fn main() -> Result<()> {
     let mut forbidden: Vec<String> = Vec::new();
     forbidden.push(".".to_owned());
     forbidden.push("mnt".to_owned());
-    let res = walk_dir("/".to_owned(), forbidden);
+    forbidden.push("usr".to_owned());
+    forbidden.push("proc".to_owned());
+    forbidden.push("sys".to_owned());
+    let res = walk_dir("/", &forbidden);
     res
 }
