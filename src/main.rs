@@ -1,6 +1,25 @@
 use error_chain::error_chain;
 
+use clap::Parser;
 use walkdir::WalkDir;
+
+/// A simple file tree traverer
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Root of search
+    #[arg(short, long)]
+    root: String,
+
+    /// List of forbiden directory names.
+    /// Any dir which name starts with any of the entryies will be skipped and not walked into
+    #[arg(short, long)]
+    forbidden: Vec<String>,
+
+    /// Max depth to walk
+    #[arg(short, long, default_value_t = i32::MAX)]
+    max_depth: i32,
+}
 
 error_chain! {
     foreign_links {
@@ -57,10 +76,8 @@ fn walk_dir(dir: &str, forbidden: &Vec<String>, mut max_depth: i32) -> Result<()
 }
 
 fn main() -> Result<()> {
-    let mut forbidden: Vec<String> = Vec::new();
-    forbidden.push(".".to_owned());
-    forbidden.push("e2e".to_owned());
-    forbidden.push("/".to_owned());
-    let res = walk_dir("/root/dev", &forbidden, 2);
+    let args = Args::parse();
+
+    let res = walk_dir(&args.root, &args.forbidden, args.max_depth);
     res
 }
