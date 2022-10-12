@@ -22,8 +22,13 @@ fn is_whitelisted(file_name: &str, forbidden: &Vec<String>) -> bool {
     true
 }
 
-fn walk_dir(dir: &str, forbidden: &Vec<String>) -> Result<()> {
+fn walk_dir(dir: &str, forbidden: &Vec<String>, mut max_depth: i32) -> Result<()> {
     println!("{}", dir);
+    if max_depth <= 0 {
+        return Ok(());
+    }
+    max_depth -= 1;
+
     let walker = WalkDir::new(dir);
 
     let dirs = walker
@@ -39,13 +44,13 @@ fn walk_dir(dir: &str, forbidden: &Vec<String>) -> Result<()> {
             )
         })
         .map(|entry| entry.path().display().to_string())
-        .filter(|entry| !entry.eq(dir));
+        .filter(|entry| entry.ne(dir) && entry.ne("/"));
     let mut res = Ok(());
     if dir.len() == 0 {
         return Ok(());
     }
     for dir in dirs {
-        res = walk_dir(&dir, &forbidden);
+        res = walk_dir(&dir, &forbidden, max_depth);
     }
 
     res
@@ -54,10 +59,8 @@ fn walk_dir(dir: &str, forbidden: &Vec<String>) -> Result<()> {
 fn main() -> Result<()> {
     let mut forbidden: Vec<String> = Vec::new();
     forbidden.push(".".to_owned());
-    forbidden.push("mnt".to_owned());
-    forbidden.push("usr".to_owned());
-    forbidden.push("proc".to_owned());
-    forbidden.push("sys".to_owned());
-    let res = walk_dir("/", &forbidden);
+    forbidden.push("e2e".to_owned());
+    forbidden.push("/".to_owned());
+    let res = walk_dir("/root/dev", &forbidden, 2);
     res
 }
