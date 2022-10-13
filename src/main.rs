@@ -1,6 +1,7 @@
-use std::{fs::File, io::Write, panic};
+use std::{fs::File, io::Read, io::Write, path::Path};
 
 use error_chain::error_chain;
+use std::thread;
 
 use clap::Parser;
 use walkdir::WalkDir;
@@ -86,23 +87,47 @@ fn walk_dir(
     Ok(())
 }
 
-fn main() -> std::result::Result<(), ()> {
-    let args = Args::parse();
-
-    let mut cache = File::create("/root/.stribog");
-    if cache.is_err() {
-        return Err(());
-    }
-    let cache_file_ptr = cache.unwrap();
-
-    if args.root.len() <= 0 {
-        panic!("Must pass at least one root dir");
-    }
-
+fn write_cache(args: Args, cache_file: &File) -> std::result::Result<(), ()> {
     for root in args.root.into_iter() {
-        if walk_dir(&root, &args.forbidden, args.max_depth, &cache_file_ptr).is_err() {
+        if walk_dir(&root, &args.forbidden, args.max_depth, cache_file).is_err() {
             return Ok(());
         }
     }
+
+    Ok(())
+}
+
+fn main() -> std::result::Result<(), ()> {
+    let args = Args::parse();
+
+    if !Path::new("/root/.stribog").exists() {
+        return Err(());
+    }
+
+    let cache = File::open("/root/.stribog");
+    if cache.is_err() {
+        return Err(());
+    }
+
+    let mut cache_file = cache.unwrap();
+    let mut cached_entries = String::new();
+    if cache_file.read_to_string(&mut cached_entries).is_err() {
+        return Err(());
+    }
+
+    println!("{}", cached_entries);
+    let handle = thread::spawn(|| {
+        let cache = File::create("/root/.stribog");
+        if cache.is_err() {
+            return;
+        }
+        let cache_file = cache.unwrap();
+        if write_cache(args, &cache_file).is_err() {
+            panic!("Error writting cache");
+        }
+    });
+
+    handle.join().unwrap();
+
     Ok(())
 }
