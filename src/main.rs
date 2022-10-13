@@ -7,12 +7,12 @@ use walkdir::WalkDir;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Root of search
+    /// List of root directories to search
     #[arg(short, long)]
-    root: String,
+    root: Vec<String>,
 
     /// List of forbiden directory names.
-    /// Any dir which name starts with any of the entryies will be skipped and not walked into
+    /// Any dir which name starts with any of the entries will be skipped and not walked into
     #[arg(short, long)]
     forbidden: Vec<String>,
 
@@ -78,6 +78,14 @@ fn walk_dir(dir: &str, forbidden: &Vec<String>, mut max_depth: i32) -> Result<()
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let res = walk_dir(&args.root, &args.forbidden, args.max_depth);
-    res
+    if args.root.len() <= 0 {
+        panic!("Must pass at least one root dir");
+    }
+
+    for root in args.root.into_iter() {
+        if walk_dir(&root, &args.forbidden, args.max_depth).is_err() {
+            panic!("Walk dir paniced");
+        }
+    }
+    Ok(())
 }
