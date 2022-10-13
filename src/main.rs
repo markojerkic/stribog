@@ -43,10 +43,16 @@ fn is_whitelisted(file_name: &str, forbidden: &Vec<String>) -> bool {
     true
 }
 
-fn walk_dir(dir: &str, forbidden: &Vec<String>, mut max_depth: i32) -> std::result::Result<(), ()> {
-    if panic::catch_unwind(|| println!("{}", dir)).is_err() {
+fn walk_dir(
+    dir: &str,
+    forbidden: &Vec<String>,
+    mut max_depth: i32,
+    mut cache_file: &File,
+) -> std::result::Result<(), ()> {
+    if writeln!(cache_file, "{}", dir).is_err() {
         return Err(());
     }
+
     if max_depth <= 0 {
         return Ok(());
     }
@@ -72,7 +78,7 @@ fn walk_dir(dir: &str, forbidden: &Vec<String>, mut max_depth: i32) -> std::resu
         return Ok(());
     }
     for dir in dirs {
-        if walk_dir(&dir, &forbidden, max_depth).is_err() {
+        if walk_dir(&dir, &forbidden, max_depth, cache_file).is_err() {
             return Err(());
         };
     }
@@ -80,30 +86,21 @@ fn walk_dir(dir: &str, forbidden: &Vec<String>, mut max_depth: i32) -> std::resu
     Ok(())
 }
 
-fn write_cache(mut cache_file: File) -> Result<()> {
-    println!("tu sam");
-    cache_file.write_all(b"test");
-
-    Ok(())
-}
-
 fn main() -> std::result::Result<(), ()> {
-    let mut cache = File::create("/root/.stribog");
-    if cache.is_ok() {
-        write_cache(cache.unwrap());
-    } else {
-        println!("greka {}", cache.unwrap_err());
-        panic!();
-    }
-    return Ok(());
-
     let args = Args::parse();
+
+    let mut cache = File::create("/root/.stribog");
+    if cache.is_err() {
+        return Err(());
+    }
+    let cache_file_ptr = cache.unwrap();
+
     if args.root.len() <= 0 {
         panic!("Must pass at least one root dir");
     }
 
     for root in args.root.into_iter() {
-        if walk_dir(&root, &args.forbidden, args.max_depth).is_err() {
+        if walk_dir(&root, &args.forbidden, args.max_depth, &cache_file_ptr).is_err() {
             return Ok(());
         }
     }
