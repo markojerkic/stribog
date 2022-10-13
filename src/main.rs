@@ -1,4 +1,4 @@
-use std::panic;
+use std::{fs::File, io::Write, panic};
 
 use error_chain::error_chain;
 
@@ -80,7 +80,23 @@ fn walk_dir(dir: &str, forbidden: &Vec<String>, mut max_depth: i32) -> std::resu
     Ok(())
 }
 
+fn write_cache(mut cache_file: File) -> Result<()> {
+    println!("tu sam");
+    cache_file.write_all(b"test");
+
+    Ok(())
+}
+
 fn main() -> std::result::Result<(), ()> {
+    let mut cache = File::create("/root/.stribog");
+    if cache.is_ok() {
+        write_cache(cache.unwrap());
+    } else {
+        println!("greka {}", cache.unwrap_err());
+        panic!();
+    }
+    return Ok(());
+
     let args = Args::parse();
     if args.root.len() <= 0 {
         panic!("Must pass at least one root dir");
