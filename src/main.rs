@@ -22,6 +22,9 @@ struct Args {
     /// Max depth to walk
     #[arg(short, long, default_value_t = i32::MAX)]
     max_depth: i32,
+
+    #[arg(short, long, default_value_t = false)]
+    use_cache: bool,
 }
 
 error_chain! {
@@ -53,7 +56,6 @@ fn walk_dir(
     if writeln!(cache_file, "{}", dir).is_err() {
         return Err(());
     }
-
     if max_depth <= 0 {
         return Ok(());
     }
@@ -87,6 +89,45 @@ fn walk_dir(
     Ok(())
 }
 
+fn walk_dir_stdout(
+    dir: &str,
+    forbidden: &Vec<String>,
+    mut max_depth: i32,
+) -> std::result::Result<(), ()> {
+    println!("{}", dir);
+    if max_depth <= 0 {
+        return Ok(());
+    }
+    max_depth -= 1;
+
+    let walker = WalkDir::new(dir);
+
+    let dirs = walker
+        .max_depth(1)
+        .into_iter()
+        .filter(|entry| entry.is_ok())
+        .map(|entry| entry.unwrap())
+        .filter(|entry| entry.file_type().is_dir())
+        .filter(|entry| {
+            is_whitelisted(
+                entry.file_name().to_string_lossy().to_string().as_str(),
+                forbidden,
+            )
+        })
+        .map(|entry| entry.path().display().to_string())
+        .filter(|entry| entry.ne(dir) && entry.ne("/"));
+    if dir.len() == 0 {
+        return Ok(());
+    }
+    for dir in dirs {
+        if walk_dir_stdout(&dir, &forbidden, max_depth).is_err() {
+            return Err(());
+        };
+    }
+
+    Ok(())
+}
+
 fn write_cache(args: Args, cache_file: &File) -> std::result::Result<(), ()> {
     for root in args.root.into_iter() {
         if walk_dir(&root, &args.forbidden, args.max_depth, cache_file).is_err() {
@@ -96,10 +137,16 @@ fn write_cache(args: Args, cache_file: &File) -> std::result::Result<(), ()> {
 
     Ok(())
 }
+fn write_std(args: Args) -> std::result::Result<(), ()> {
+    for root in args.root.into_iter() {
+        if walk_dir_stdout(&root, &args.forbidden, args.max_depth).is_err() {
+            return Ok(());
+        }
+    }
+    Ok(())
+}
 
-fn main() -> std::result::Result<(), ()> {
-    let args = Args::parse();
-
+fn read_cache() -> std::result::Result<(), ()> {
     if !Path::new("/root/.stribog").exists() {
         return Err(());
     }
@@ -116,6 +163,10 @@ fn main() -> std::result::Result<(), ()> {
     }
 
     println!("{}", cached_entries);
+    Ok(())
+}
+
+fn write_cache_async(args: Args) -> std::result::Result<(), ()> {
     let handle = thread::spawn(|| {
         let cache = File::create("/root/.stribog");
         if cache.is_err() {
@@ -128,6 +179,25 @@ fn main() -> std::result::Result<(), ()> {
     });
 
     handle.join().unwrap();
+
+    Ok(())
+}
+
+fn main() -> std::result::Result<(), ()> {
+    let args = Args::parse();
+
+    if args.use_cache {
+        if read_cache().is_err() {
+            return Err(());
+        }
+        if write_cache_async(args).is_err() {
+            return Err(());
+        }
+    } else {
+        if write_std(args).is_err() {
+            return Err(());
+        }
+    }
 
     Ok(())
 }
