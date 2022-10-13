@@ -8,7 +8,7 @@ use walkdir::WalkDir;
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// List of root directories to search
-    #[arg(short, long)]
+    #[arg(short, long, num_args = 1.., required=true)]
     root: Vec<String>,
 
     /// List of forbiden directory names.
@@ -41,7 +41,7 @@ fn is_whitelisted(file_name: &str, forbidden: &Vec<String>) -> bool {
     true
 }
 
-fn walk_dir(dir: &str, forbidden: &Vec<String>, mut max_depth: i32) -> Result<()> {
+fn walk_dir(dir: &str, forbidden: &Vec<String>, mut max_depth: i32) -> std::result::Result<(), ()> {
     println!("{}", dir);
     if max_depth <= 0 {
         return Ok(());
@@ -64,20 +64,20 @@ fn walk_dir(dir: &str, forbidden: &Vec<String>, mut max_depth: i32) -> Result<()
         })
         .map(|entry| entry.path().display().to_string())
         .filter(|entry| entry.ne(dir) && entry.ne("/"));
-    let mut res = Ok(());
     if dir.len() == 0 {
         return Ok(());
     }
     for dir in dirs {
-        res = walk_dir(&dir, &forbidden, max_depth);
+        if walk_dir(&dir, &forbidden, max_depth).is_err() {
+            return Err(());
+        };
     }
 
-    res
+    Ok(())
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
-
     if args.root.len() <= 0 {
         panic!("Must pass at least one root dir");
     }
