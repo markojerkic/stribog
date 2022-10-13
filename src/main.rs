@@ -155,7 +155,7 @@ fn get_cache_file_name(is_linux: bool) -> String {
     if is_linux {
         return "/root/.stribog".to_owned();
     } else {
-        return "C:\\.stribog".to_owned();
+        return "C:\\Dev\\.stribog".to_owned();
     }
 }
 
@@ -202,6 +202,13 @@ fn main() -> std::result::Result<(), ()> {
     let args = Args::parse();
 
     if args.use_cache {
+        let cn = &get_cache_file_name(args.is_linux);
+        if !Path::new(&cn).exists() {
+            let cache = File::create(cn);
+            if cache.is_err() {
+                return Err(());
+            }
+        }
         if read_cache(args.is_linux).is_err() {
             return Err(());
         }
