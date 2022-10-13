@@ -1,3 +1,5 @@
+use std::panic;
+
 use error_chain::error_chain;
 
 use clap::Parser;
@@ -42,7 +44,9 @@ fn is_whitelisted(file_name: &str, forbidden: &Vec<String>) -> bool {
 }
 
 fn walk_dir(dir: &str, forbidden: &Vec<String>, mut max_depth: i32) -> std::result::Result<(), ()> {
-    println!("{}", dir);
+    if panic::catch_unwind(|| println!("{}", dir)).is_err() {
+        return Err(());
+    }
     if max_depth <= 0 {
         return Ok(());
     }
@@ -76,7 +80,7 @@ fn walk_dir(dir: &str, forbidden: &Vec<String>, mut max_depth: i32) -> std::resu
     Ok(())
 }
 
-fn main() -> Result<()> {
+fn main() -> std::result::Result<(), ()> {
     let args = Args::parse();
     if args.root.len() <= 0 {
         panic!("Must pass at least one root dir");
@@ -84,7 +88,7 @@ fn main() -> Result<()> {
 
     for root in args.root.into_iter() {
         if walk_dir(&root, &args.forbidden, args.max_depth).is_err() {
-            panic!("Walk dir paniced");
+            return Ok(());
         }
     }
     Ok(())
