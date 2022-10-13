@@ -23,8 +23,13 @@ struct Args {
     #[arg(short, long, default_value_t = i32::MAX)]
     max_depth: i32,
 
+    /// Opt in to use cached valus. Always a little bit behind, but should be faster
     #[arg(short, long, default_value_t = false)]
     use_cache: bool,
+
+    /// Set if used on linux
+    #[arg(short, long, default_value_t = false)]
+    is_linux: bool,
 }
 
 error_chain! {
@@ -146,12 +151,21 @@ fn write_std(args: Args) -> std::result::Result<(), ()> {
     Ok(())
 }
 
-fn read_cache() -> std::result::Result<(), ()> {
-    if !Path::new("/root/.stribog").exists() {
+fn get_cache_file_name(is_linux: bool) -> String {
+    if is_linux {
+        return "/root/.stribog".to_owned();
+    } else {
+        return "C:\\.stribog".to_owned();
+    }
+}
+
+fn read_cache(is_linux: bool) -> std::result::Result<(), ()> {
+    let cache_file_name = get_cache_file_name(is_linux);
+    if !Path::new(&cache_file_name).exists() {
         return Err(());
     }
 
-    let cache = File::open("/root/.stribog");
+    let cache = File::open(cache_file_name);
     if cache.is_err() {
         return Err(());
     }
@@ -168,7 +182,8 @@ fn read_cache() -> std::result::Result<(), ()> {
 
 fn write_cache_async(args: Args) -> std::result::Result<(), ()> {
     let handle = thread::spawn(|| {
-        let cache = File::create("/root/.stribog");
+        let cache_file_name = get_cache_file_name(args.is_linux);
+        let cache = File::create(cache_file_name);
         if cache.is_err() {
             return;
         }
@@ -187,7 +202,7 @@ fn main() -> std::result::Result<(), ()> {
     let args = Args::parse();
 
     if args.use_cache {
-        if read_cache().is_err() {
+        if read_cache(args.is_linux).is_err() {
             return Err(());
         }
         if write_cache_async(args).is_err() {
