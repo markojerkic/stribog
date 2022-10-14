@@ -153,7 +153,7 @@ fn write_std(args: Args) -> std::result::Result<(), ()> {
 
 fn get_cache_file_name(is_linux: bool) -> String {
     if is_linux {
-        return "/root/.stribog".to_owned();
+        return "/root/dev/.stribog".to_owned();
     } else {
         return "C:\\Dev\\.stribog".to_owned();
     }
