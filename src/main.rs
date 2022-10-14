@@ -181,7 +181,7 @@ fn read_cache(is_linux: bool) -> std::result::Result<(), ()> {
 }
 
 fn write_cache_async(args: Args) -> std::result::Result<(), ()> {
-    let handle = thread::spawn(|| {
+    thread::spawn(|| {
         let cache_file_name = get_cache_file_name(args.is_linux);
         let cache = File::create(cache_file_name);
         if cache.is_err() {
@@ -192,8 +192,6 @@ fn write_cache_async(args: Args) -> std::result::Result<(), ()> {
             panic!("Error writting cache");
         }
     });
-
-    handle.join().unwrap();
 
     Ok(())
 }
