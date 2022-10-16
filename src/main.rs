@@ -1,5 +1,3 @@
-#[macro_use]
-extern crate windows_service;
 use std::{
     fs::{rename, File},
     io::Read,
@@ -208,37 +206,6 @@ fn write_cache_deamon(args: Args) -> std::result::Result<(), String> {
     Ok(())
 }
 
-fn main() -> std::result::Result<(), String> {
-    let args = Args::parse();
-
-    if args.use_cache {
-        let cn = &get_cache_file_name(args.is_linux);
-        if !Path::new(&cn).exists() {
-            let _cache = match File::create(cn) {
-                Ok(ok) => ok,
-                Err(err) => return Err(err.to_string()),
-            };
-        }
-
-        // match read_cache(args.is_linux) {
-        //     Ok(ok) => ok,
-        //     Err(err) => return Err(err),
-        // }
-
-        match deamon() {
-            Ok(ok) => ok,
-            Err(err) => return Err(err),
-        }
-    } else {
-        match write_std(args) {
-            Ok(ok) => ok,
-            Err(err) => return Err(err),
-        }
-    }
-
-    Ok(())
-}
-
 #[cfg(not(windows))]
 fn deamon(args: Args) -> std::result::Result<(), String> {
     use daemonize::Daemonize;
@@ -252,27 +219,37 @@ fn deamon(args: Args) -> std::result::Result<(), String> {
 }
 
 #[cfg(windows)]
-use std::ffi::OsString;
-#[cfg(windows)]
-define_windows_service!(ffi_service_main, write_service);
-#[cfg(windows)]
-fn write_service(arguments: Vec<OsString>) {
-    println!("test");
+fn deamon(args: Args) -> std::result::Result<(), String> {
+    return write_cache_deamon(args);
 }
 
-#[cfg(windows)]
-fn deamon() -> std::result::Result<(), String> {
-    use windows_service::service_dispatcher;
+fn main() -> std::result::Result<(), String> {
+    let args = Args::parse();
 
-    service_dispatcher::start("write_service", ffi_service_main)
-        .expect("Failed to create Windows service");
+    if args.use_cache {
+        let cn = &get_cache_file_name(args.is_linux);
+        if !Path::new(&cn).exists() {
+            let _cache = match File::create(cn) {
+                Ok(ok) => ok,
+                Err(err) => return Err(err.to_string()),
+            };
+        }
 
-    // let daemonize = Daemonize::new()
-    //     .umask(0o777)
-    //     .privileged_action(|| write_cache_deamon(args));
-    // match daemonize.start() {
-    //     Ok(_ok) => return Ok(()),
-    //     Err(err) => return Err(err.to_string()),
-    // }
+        match read_cache(args.is_linux) {
+            Ok(ok) => ok,
+            Err(err) => return Err(err),
+        }
+
+        match deamon(args) {
+            Ok(ok) => ok,
+            Err(err) => return Err(err),
+        }
+    } else {
+        match write_std(args) {
+            Ok(ok) => ok,
+            Err(err) => return Err(err),
+        }
+    }
+
     Ok(())
 }
