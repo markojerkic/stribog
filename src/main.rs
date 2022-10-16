@@ -57,9 +57,10 @@ fn walk_dir(
     forbidden: &Vec<String>,
     mut max_depth: i32,
     mut cache_file: &File,
-) -> std::result::Result<(), ()> {
-    if writeln!(cache_file, "{}", dir).is_err() {
-        return Err(());
+) -> std::result::Result<(), String> {
+    match writeln!(cache_file, "{}", dir) {
+        Ok(ok) => ok,
+        Err(err) => return Err(err.to_string()),
     }
     if max_depth <= 0 {
         return Ok(());
@@ -86,8 +87,9 @@ fn walk_dir(
         return Ok(());
     }
     for dir in dirs {
-        if walk_dir(&dir, &forbidden, max_depth, cache_file).is_err() {
-            return Err(());
+        match walk_dir(&dir, &forbidden, max_depth, cache_file) {
+            Ok(ok) => ok,
+            Err(err) => return Err(err),
         };
     }
 
@@ -98,7 +100,7 @@ fn walk_dir_stdout(
     dir: &str,
     forbidden: &Vec<String>,
     mut max_depth: i32,
-) -> std::result::Result<(), ()> {
+) -> std::result::Result<(), String> {
     println!("{}", dir);
     if max_depth <= 0 {
         return Ok(());
@@ -125,27 +127,30 @@ fn walk_dir_stdout(
         return Ok(());
     }
     for dir in dirs {
-        if walk_dir_stdout(&dir, &forbidden, max_depth).is_err() {
-            return Err(());
+        match walk_dir_stdout(&dir, &forbidden, max_depth) {
+            Ok(ok) => ok,
+            Err(err) => return Err(err),
         };
     }
 
     Ok(())
 }
 
-fn write_cache(args: Args, cache_file: &File) -> std::result::Result<(), ()> {
+fn write_cache(args: Args, cache_file: &File) -> std::result::Result<(), String> {
     for root in args.root.into_iter() {
-        if walk_dir(&root, &args.forbidden, args.max_depth, cache_file).is_err() {
-            return Ok(());
+        match walk_dir(&root, &args.forbidden, args.max_depth, cache_file) {
+            Ok(ok) => ok,
+            Err(err) => return Err(err),
         }
     }
 
     Ok(())
 }
-fn write_std(args: Args) -> std::result::Result<(), ()> {
+fn write_std(args: Args) -> std::result::Result<(), String> {
     for root in args.root.into_iter() {
-        if walk_dir_stdout(&root, &args.forbidden, args.max_depth).is_err() {
-            return Ok(());
+        match walk_dir_stdout(&root, &args.forbidden, args.max_depth) {
+            Ok(ok) => ok,
+            Err(err) => return Err(err),
         }
     }
     Ok(())
@@ -159,63 +164,69 @@ fn get_cache_file_name(is_linux: bool) -> String {
     }
 }
 
-fn read_cache(is_linux: bool) -> std::result::Result<(), ()> {
+fn read_cache(is_linux: bool) -> std::result::Result<(), String> {
     let cache_file_name = get_cache_file_name(is_linux);
     if !Path::new(&cache_file_name).exists() {
-        return Err(());
+        return Err("Error checking if file exists".to_owned());
     }
 
     let cache = File::open(cache_file_name);
     if cache.is_err() {
-        return Err(());
+        return Err(cache.unwrap_err().to_string());
     }
 
     let mut cache_file = cache.unwrap();
     let mut cached_entries = String::new();
-    if cache_file.read_to_string(&mut cached_entries).is_err() {
-        return Err(());
-    }
+    match cache_file.read_to_string(&mut cached_entries) {
+        Ok(res) => res,
+        Err(err) => return Err(err.to_string()),
+    };
 
     println!("{}", cached_entries);
     Ok(())
 }
 
-fn write_cache_async(args: Args) -> std::result::Result<(), ()> {
+fn write_cache_async(args: Args) -> std::result::Result<(), String> {
     thread::spawn(|| {
         let cache_file_name = get_cache_file_name(args.is_linux);
-        let cache = File::create(cache_file_name);
-        if cache.is_err() {
-            return;
-        }
-        let cache_file = cache.unwrap();
-        if write_cache(args, &cache_file).is_err() {
-            panic!("Error writting cache");
+        let cache_file = match File::create(cache_file_name) {
+            Ok(ok) => ok,
+            Err(err) => return Err(err.to_string()),
+        };
+        match write_cache(args, &cache_file) {
+            Ok(ok) => Ok(ok),
+            Err(err) => return Err(err),
         }
     });
 
     Ok(())
 }
 
-fn main() -> std::result::Result<(), ()> {
+fn main() -> std::result::Result<(), String> {
     let args = Args::parse();
 
     if args.use_cache {
         let cn = &get_cache_file_name(args.is_linux);
         if !Path::new(&cn).exists() {
-            let cache = File::create(cn);
-            if cache.is_err() {
-                return Err(());
-            }
+            let _cache = match File::create(cn) {
+                Ok(ok) => ok,
+                Err(err) => return Err(err.to_string()),
+            };
         }
-        if read_cache(args.is_linux).is_err() {
-            return Err(());
+
+        match read_cache(args.is_linux) {
+            Ok(ok) => ok,
+            Err(err) => return Err(err),
         }
-        if write_cache_async(args).is_err() {
-            return Err(());
+
+        match write_cache_async(args) {
+            Ok(ok) => ok,
+            Err(err) => return Err(err),
         }
     } else {
-        if write_std(args).is_err() {
-            return Err(());
+        match write_std(args) {
+            Ok(ok) => ok,
+            Err(err) => return Err(err),
         }
     }
 
