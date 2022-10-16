@@ -26,6 +26,14 @@ struct Args {
     #[arg(short, long, default_value_t = false)]
     use_cache: bool,
 
+    /// If selected, nothing will be printed to stdout. The result of directory tree walking will be written in the cache file.
+    #[arg(short, long, default_value_t = false)]
+    cache_only: bool,
+
+    /// If selected, deamon service will not be run
+    #[arg(short, long, default_value_t = false)]
+    no_deamon: bool,
+
     /// Set if used on linux
     #[arg(short, long, default_value_t = false)]
     is_linux: bool,
@@ -185,18 +193,18 @@ fn read_cache(is_linux: bool) -> std::result::Result<(), String> {
 }
 
 fn write_cache_deamon(args: Args) -> std::result::Result<(), String> {
-    let cache_file_name = &get_cache_file_name(args.is_linux);
-
-    let cache_file = match File::create(cache_file_name) {
-        Ok(ok) => ok,
-        Err(err) => return Err(err.to_string()),
-    };
-
+    let is_linux = args.is_linux;
     let mut builder = Builder::default();
     match write_cache(args, &mut builder) {
         Ok(_ok) => _ok,
         Err(err) => return Err(err),
     }
+    let cache_file_name = &get_cache_file_name(is_linux);
+
+    let cache_file = match File::create(cache_file_name) {
+        Ok(ok) => ok,
+        Err(err) => return Err(err.to_string()),
+    };
 
     writeln!(
         &cache_file,
@@ -243,13 +251,17 @@ fn main() -> std::result::Result<(), String> {
 
         let is_linux = args.is_linux;
 
-        match read_cache(is_linux) {
-            Ok(ok) => ok,
-            Err(err) => return Err(err),
+        if !args.cache_only {
+            match read_cache(is_linux) {
+                Ok(ok) => ok,
+                Err(err) => return Err(err),
+            }
         }
-        match deamon(args) {
-            Ok(ok) => ok,
-            Err(err) => return Err(err),
+        if !args.no_deamon {
+            match deamon(args) {
+                Ok(ok) => ok,
+                Err(err) => return Err(err),
+            }
         }
     } else {
         match write_std(args) {
