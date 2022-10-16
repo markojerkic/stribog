@@ -187,7 +187,7 @@ fn read_cache(is_linux: bool) -> std::result::Result<(), String> {
 }
 
 fn write_cache_async(args: Args) -> std::result::Result<(), String> {
-    match thread::spawn(|| {
+    thread::spawn(|| {
         let cache_file_name = get_cache_file_name(args.is_linux);
         let cache_file = match File::create(cache_file_name) {
             Ok(ok) => ok,
@@ -197,12 +197,8 @@ fn write_cache_async(args: Args) -> std::result::Result<(), String> {
             Ok(ok) => Ok(ok),
             Err(err) => return Err(err),
         }
-    })
-    .join()
-    {
-        Ok(ok) => return ok,
-        Err(_err) => return Err("Error joining thread".to_owned()),
-    }
+    });
+    Ok(())
 }
 
 fn main() -> std::result::Result<(), String> {
