@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate windows_service;
 use std::{
     fs::{rename, File},
     io::Read,
@@ -5,7 +7,6 @@ use std::{
     path::Path,
 };
 
-use daemonize::Daemonize;
 use error_chain::error_chain;
 
 use clap::Parser;
@@ -207,29 +208,6 @@ fn write_cache_deamon(args: Args) -> std::result::Result<(), String> {
     Ok(())
 }
 
-#[cfg(not(windows))]
-fn deamon(args: Args) -> std::result::Result<(), String> {
-    let daemonize = Daemonize::new()
-        .umask(0o777)
-        .privileged_action(|| write_cache_deamon(args));
-    match daemonize.start() {
-        Ok(_ok) => return Ok(()),
-        Err(err) => return Err(err.to_string()),
-    }
-}
-
-#[cfg(windows)]
-fn deamon() -> std::result::Result<(), String> {
-    // let daemonize = Daemonize::new()
-    //     .umask(0o777)
-    //     .privileged_action(|| write_cache_deamon(args));
-    // match daemonize.start() {
-    //     Ok(_ok) => return Ok(()),
-    //     Err(err) => return Err(err.to_string()),
-    // }
-    Ok(())
-}
-
 fn main() -> std::result::Result<(), String> {
     let args = Args::parse();
 
@@ -242,10 +220,10 @@ fn main() -> std::result::Result<(), String> {
             };
         }
 
-        match read_cache(args.is_linux) {
-            Ok(ok) => ok,
-            Err(err) => return Err(err),
-        }
+        // match read_cache(args.is_linux) {
+        //     Ok(ok) => ok,
+        //     Err(err) => return Err(err),
+        // }
 
         match deamon() {
             Ok(ok) => ok,
@@ -258,5 +236,43 @@ fn main() -> std::result::Result<(), String> {
         }
     }
 
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn deamon(args: Args) -> std::result::Result<(), String> {
+    use daemonize::Daemonize;
+    let daemonize = Daemonize::new()
+        .umask(0o777)
+        .privileged_action(|| write_cache_deamon(args));
+    match daemonize.start() {
+        Ok(_ok) => return Ok(()),
+        Err(err) => return Err(err.to_string()),
+    }
+}
+
+#[cfg(windows)]
+use std::ffi::OsString;
+#[cfg(windows)]
+define_windows_service!(ffi_service_main, write_service);
+#[cfg(windows)]
+fn write_service(arguments: Vec<OsString>) {
+    println!("test");
+}
+
+#[cfg(windows)]
+fn deamon() -> std::result::Result<(), String> {
+    use windows_service::service_dispatcher;
+
+    service_dispatcher::start("write_service", ffi_service_main)
+        .expect("Failed to create Windows service");
+
+    // let daemonize = Daemonize::new()
+    //     .umask(0o777)
+    //     .privileged_action(|| write_cache_deamon(args));
+    // match daemonize.start() {
+    //     Ok(_ok) => return Ok(()),
+    //     Err(err) => return Err(err.to_string()),
+    // }
     Ok(())
 }
