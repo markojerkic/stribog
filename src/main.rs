@@ -207,6 +207,29 @@ fn write_cache_deamon(args: Args) -> std::result::Result<(), String> {
     Ok(())
 }
 
+#[cfg(not(windows))]
+fn deamon(args: Args) -> std::result::Result<(), String> {
+    let daemonize = Daemonize::new()
+        .umask(0o777)
+        .privileged_action(|| write_cache_deamon(args));
+    match daemonize.start() {
+        Ok(_ok) => return Ok(()),
+        Err(err) => return Err(err.to_string()),
+    }
+}
+
+#[cfg(windows)]
+fn deamon() -> std::result::Result<(), String> {
+    // let daemonize = Daemonize::new()
+    //     .umask(0o777)
+    //     .privileged_action(|| write_cache_deamon(args));
+    // match daemonize.start() {
+    //     Ok(_ok) => return Ok(()),
+    //     Err(err) => return Err(err.to_string()),
+    // }
+    Ok(())
+}
+
 fn main() -> std::result::Result<(), String> {
     let args = Args::parse();
 
@@ -224,12 +247,9 @@ fn main() -> std::result::Result<(), String> {
             Err(err) => return Err(err),
         }
 
-        let daemonize = Daemonize::new()
-            .umask(0o777)
-            .privileged_action(|| write_cache_deamon(args));
-        match daemonize.start() {
-            Ok(_ok) => return Ok(()),
-            Err(err) => return Err(err.to_string()),
+        match deamon() {
+            Ok(ok) => ok,
+            Err(err) => return Err(err),
         }
     } else {
         match write_std(args) {
