@@ -1,7 +1,7 @@
 use std::{fs::File, io::Read, io::Write, path::Path};
 
+use daemonize::Daemonize;
 use error_chain::error_chain;
-use std::thread;
 
 use clap::Parser;
 use walkdir::WalkDir;
@@ -186,19 +186,16 @@ fn read_cache(is_linux: bool) -> std::result::Result<(), String> {
     Ok(())
 }
 
-fn write_cache_async(args: Args) -> std::result::Result<(), String> {
-    thread::spawn(|| {
-        let cache_file_name = get_cache_file_name(args.is_linux);
-        let cache_file = match File::create(cache_file_name) {
-            Ok(ok) => ok,
-            Err(err) => return Err(err.to_string()),
-        };
-        match write_cache(args, &cache_file) {
-            Ok(ok) => Ok(ok),
-            Err(err) => return Err(err),
-        }
-    });
-    Ok(())
+fn write_cache_deamon(args: Args) -> std::result::Result<(), String> {
+    let cache_file_name = get_cache_file_name(args.is_linux);
+    let cache_file = match File::create(cache_file_name) {
+        Ok(ok) => ok,
+        Err(err) => return Err(err.to_string()),
+    };
+    match write_cache(args, &cache_file) {
+        Ok(_ok) => return Ok(()),
+        Err(err) => return Err(err),
+    }
 }
 
 fn main() -> std::result::Result<(), String> {
@@ -218,10 +215,22 @@ fn main() -> std::result::Result<(), String> {
             Err(err) => return Err(err),
         }
 
-        match write_cache_async(args) {
-            Ok(ok) => ok,
-            Err(err) => return Err(err),
+        let daemonize = Daemonize::new()
+            .chown_pid_file(true) // is optional, see `Daemonize` documentation
+            .working_directory("/tmp") // for default behaviour.
+            // .user("nobody")
+            // .group("daemon") // Group name
+            // .group(2) // or group id.
+            .umask(0o777)
+            .privileged_action(|| write_cache_deamon(args));
+        match daemonize.start() {
+            Ok(_ok) => return Ok(()),
+            Err(err) => return Err(err.to_string()),
         }
+        // match write_cache_async(args) {
+        //     Ok(ok) => ok,
+        //     Err(err) => return Err(err),
+        // }
     } else {
         match write_std(args) {
             Ok(ok) => ok,

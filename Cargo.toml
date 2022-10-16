@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.0.14", features = ["derive"] }
+daemonize = "0.4.1"
 error-chain = "0.12.4"
 walkdir = "2.3.2"
