@@ -1,11 +1,6 @@
-use std::{
-    fs::{rename, File},
-    io::Read,
-    io::Write,
-    path::Path,
-};
-
 use error_chain::error_chain;
+use std::{fs::File, io::Read, io::Write, path::Path};
+use string_builder::Builder;
 
 use clap::Parser;
 use walkdir::WalkDir;
@@ -60,12 +55,11 @@ fn walk_dir(
     dir: &str,
     forbidden: &Vec<String>,
     mut max_depth: i32,
-    mut cache_file: &File,
+    builder: &mut Builder,
 ) -> std::result::Result<(), String> {
-    match writeln!(cache_file, "{}", dir) {
-        Ok(ok) => ok,
-        Err(err) => return Err(err.to_string()),
-    }
+    (*builder).append(dir);
+    (*builder).append("\n");
+
     if max_depth <= 0 {
         return Ok(());
     }
@@ -91,7 +85,7 @@ fn walk_dir(
         return Ok(());
     }
     for dir in dirs {
-        match walk_dir(&dir, &forbidden, max_depth, cache_file) {
+        match walk_dir(&dir, &forbidden, max_depth, builder) {
             Ok(ok) => ok,
             Err(err) => return Err(err),
         };
@@ -140,9 +134,9 @@ fn walk_dir_stdout(
     Ok(())
 }
 
-fn write_cache(args: Args, cache_file: &File) -> std::result::Result<(), String> {
+fn write_cache(args: Args, builder: &mut Builder) -> std::result::Result<(), String> {
     for root in args.root.into_iter() {
-        match walk_dir(&root, &args.forbidden, args.max_depth, cache_file) {
+        match walk_dir(&root, &args.forbidden, args.max_depth, builder) {
             Ok(ok) => ok,
             Err(err) => return Err(err),
         }
@@ -192,17 +186,25 @@ fn read_cache(is_linux: bool) -> std::result::Result<(), String> {
 
 fn write_cache_deamon(args: Args) -> std::result::Result<(), String> {
     let cache_file_name = &get_cache_file_name(args.is_linux);
-    let temp_cache_file_name = &(get_cache_file_name(args.is_linux) + ".1");
-    let temp_cache_file = match File::create(temp_cache_file_name) {
+
+    let cache_file = match File::create(cache_file_name) {
         Ok(ok) => ok,
         Err(err) => return Err(err.to_string()),
     };
-    match write_cache(args, &temp_cache_file) {
+
+    let mut builder = Builder::default();
+    match write_cache(args, &mut builder) {
         Ok(_ok) => _ok,
         Err(err) => return Err(err),
     }
 
-    rename(temp_cache_file_name, cache_file_name).expect("Rename file failed");
+    writeln!(
+        &cache_file,
+        "{}",
+        builder.string().expect("Building string failed")
+    )
+    .expect("Writting to file failed");
+
     Ok(())
 }
 
@@ -222,8 +224,9 @@ fn deamon(args: Args) -> std::result::Result<(), String> {
 fn deamon(args: Args) -> std::result::Result<(), String> {
     use std::thread;
 
-    thread::spawn(|| write_cache_deamon(args));
-    Ok(())
+    return thread::spawn(|| write_cache_deamon(args))
+        .join()
+        .expect("join failed");
 }
 
 fn main() -> std::result::Result<(), String> {
@@ -240,12 +243,11 @@ fn main() -> std::result::Result<(), String> {
 
         let is_linux = args.is_linux;
 
-        match deamon(args) {
+        match read_cache(is_linux) {
             Ok(ok) => ok,
             Err(err) => return Err(err),
         }
-
-        match read_cache(is_linux) {
+        match deamon(args) {
             Ok(ok) => ok,
             Err(err) => return Err(err),
         }
