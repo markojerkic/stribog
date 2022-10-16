@@ -220,7 +220,10 @@ fn deamon(args: Args) -> std::result::Result<(), String> {
 
 #[cfg(windows)]
 fn deamon(args: Args) -> std::result::Result<(), String> {
-    return write_cache_deamon(args);
+    use std::thread;
+
+    thread::spawn(|| write_cache_deamon(args));
+    Ok(())
 }
 
 fn main() -> std::result::Result<(), String> {
@@ -235,12 +238,14 @@ fn main() -> std::result::Result<(), String> {
             };
         }
 
-        match read_cache(args.is_linux) {
+        let is_linux = args.is_linux;
+
+        match deamon(args) {
             Ok(ok) => ok,
             Err(err) => return Err(err),
         }
 
-        match deamon(args) {
+        match read_cache(is_linux) {
             Ok(ok) => ok,
             Err(err) => return Err(err),
         }
